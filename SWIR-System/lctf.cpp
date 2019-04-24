@@ -1,4 +1,4 @@
-#include "lctf.h"
+﻿#include "lctf.h"
 #include<iostream>
 #include<string>
 

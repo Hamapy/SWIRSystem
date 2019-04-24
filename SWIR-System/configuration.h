@@ -15,7 +15,9 @@ class Configuration : public QMainWindow
 public:
 	Configuration(QWidget *parent = 0);
 	~Configuration();
+	friend class MainWindow;
 
+private:
 	Ui::ConfigurationClass ui;
 
 	//ÉèÖÃ²ÎÊı

@@ -1,6 +1,11 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#define LCTF_INIT_WAVELENGTH 1205
+#define LCTF_INIT_STEADYTIME 0.5
+#define SWIRWIDTH 640
+#define SWIRHEIGHT 512
+
 #include <QtWidgets/QMainWindow>
 #include <QThread>
 #include <QDebug>
@@ -26,17 +31,18 @@ public:
 	~WorkerRGB();
 	virtual void timerEvent(QTimerEvent *event);
 	//virtual void run();
-	int framerateRGB = 0;
-	QImage imgRGB;
-	Mat matRGB;
+	friend class MainWindow;
 
 private:
+	RGBCamera *cameraRGB;
+	QImage imgRGB;
+	Mat matRGB;
+	int framerateRGB = 0;
 	int timerIdRGB;
-	unsigned char*   pImageFrameRGB;//图像指针
+	unsigned char*   pImageFrameRGB;
 	int heightRGB;
 	int widthRGB;
 	
-
 signals:
 	void sendingRGB(QImage);
 	void acquringRGB(QImage);
@@ -50,6 +56,11 @@ class WorkerLCTF : public QObject
 public:
 	WorkerLCTF(QObject *parent = 0);
 	~WorkerLCTF();
+	friend class WorkerSWIR;
+	friend class MainWindow;
+
+private:
+	LCTF *lctf;
 
 private slots:
 	void waveLengthChanged(int wavelengthChanged);
@@ -65,20 +76,21 @@ public:
 	WorkerSWIR(QObject *parent = 0);
 	~WorkerSWIR();
 	virtual void timerEvent(QTimerEvent *event);
-
-	int framerateSWIR = 0;
-	QImage imgSWIR;
-	Mat matSWIR_16;
-	int timerIdSWIR;
-	//int timerIdSWIRScan;
+	friend class MainWindow;
 
 private:
+	SWIRCamera *cameraSWIR;
+	WorkerLCTF *workerLCTF;
+	QThread *threadLCTF;
+	QImage imgSWIR;
+	Mat matSWIR;
+	Mat matSWIR_16;
+	int timerIdSWIR;
+	int framerateSWIR = 0;
 	unsigned short* pImageFrameSWIR;//图像指针
 	int heightSWIR;
 	int widthSWIR;
 	
-	Mat matSWIR;
-
 private slots:
 	void Scan();
 
@@ -101,21 +113,16 @@ public:
 	MainWindow(QWidget *parent = 0);
 	~MainWindow();
 
-	Configuration *config;//参数设置页面
-	int wavelength;//在界面确定之后传回LCTF
-	QThread *threadSWIR;
-
 private:
 	Ui::MainWindowClass ui;
-	
-	unsigned char* pImageFrameRGB;//图像指针
-	unsigned short* pImageFrameSWIR;
 
+	int wavelength;//在界面确定之后传回LCTF	
+	unsigned char* pImageFrameRGB;
+	unsigned short* pImageFrameSWIR;
 	int heightRGB;
 	int heightSWIR;
 	int widthRGB;
 	int widthSWIR;
-
 	int captureSWIRNum = 0;
 	int captureRGBNum = 0;
 	int scanNum = 0;
@@ -125,18 +132,16 @@ private:
 	string captureRGBPath = "E://Capture//captureRGB//";
 	string scanPath = "E://Capture//scanSWIR//";
 
+	Configuration *config;//参数设置对象
 	WorkerRGB *workerRGB;
 	WorkerSWIR *workerSWIR;
-	WorkerLCTF *workerLCTF;
-
+	//WorkerLCTF *workerLCTF;
 	QThread *threadRGB;
-	
-	QThread *threadLCTF;
+	QThread *threadSWIR;
+	//QThread *threadLCTF;
 
 	QPixmap picRGB;
 	QPixmap picSWIR;
-	//QImage acqImageRGB;
-	//QImage acqImageSWIR;
 
 private slots:
 	void InitializeAll();

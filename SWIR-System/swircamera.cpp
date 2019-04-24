@@ -1,4 +1,4 @@
-//swirclass using c api
+﻿//swirclass using c api
 #include "swircamera.h"
 
 SWIRCamera::SWIRCamera()

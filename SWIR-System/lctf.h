@@ -1,4 +1,4 @@
-// lctf.h: interface for the LCTF class.
+﻿// lctf.h: interface for the LCTF class.
 //
 //////////////////////////////////////////////////////////////////////
 #pragma once

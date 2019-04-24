@@ -1,4 +1,4 @@
-//swir class using c api
+﻿//swir class using c api
 #pragma once
 
 #include "VimbaC.h"

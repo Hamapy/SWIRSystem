@@ -1,19 +1,11 @@
 #include "mainwindow.h"
 #include <time.h>
 
-#define LCTF_INIT_WAVELENGTH 1205
-#define LCTF_INIT_STEADYTIME 0.5
-#define SWIRWIDTH 640
-#define SWIRHEIGHT 512
-SWIRCamera *cameraSWIR = new SWIRCamera;
-RGBCamera *cameraRGB = new RGBCamera;
-LCTF *lctf = new LCTF;
-
 ////////////////////////////////RGB相机线程类////////////////////////////
 WorkerRGB::WorkerRGB(QObject *parent) :
 QObject(parent)
 {
-	//cameraRGB = new RGBCamera;
+	cameraRGB = new RGBCamera();
 	timerIdRGB = this->startTimer(framerateRGB);//设置定时器触发子线程capture
 }
 
@@ -40,7 +32,7 @@ WorkerRGB::~WorkerRGB()
 WorkerLCTF::WorkerLCTF(QObject *parent) :
 QObject(parent)
 {
-
+	lctf = new LCTF();
 }
 void WorkerLCTF::waveLengthChanged(int wavelengthChanged)
 {
@@ -54,7 +46,11 @@ WorkerLCTF::~WorkerLCTF()
 WorkerSWIR::WorkerSWIR(QObject *parent) :
 QObject(parent)
 {
-	//cameraSWIR = new SWIRCamera;
+	workerLCTF = new WorkerLCTF();
+	threadLCTF = new QThread();
+	workerLCTF->moveToThread(threadLCTF);
+
+	cameraSWIR = new SWIRCamera();
 	timerIdSWIR = this->startTimer(framerateSWIR);//设置定时器触发子线程capture
 }
 
@@ -100,7 +96,7 @@ void WorkerSWIR::Scan()
 	for (i = 920; i <= 1700; i = i + 15)
 	{
 		startExpo = clock();
-		lctf->SetWavelength(i);
+		this->workerLCTF->lctf->SetWavelength(i);
 		path = "E://Capture//scanSWIR//" + to_string(i) + ".tiff";
 		Sleep(190);
 
@@ -151,17 +147,17 @@ MainWindow::MainWindow(QWidget *parent)
 {
 	ui.setupUi(this);
 
-	workerRGB = new WorkerRGB;
-	threadRGB = new QThread;
+	workerRGB = new WorkerRGB();
+	threadRGB = new QThread();
 	workerRGB->moveToThread(threadRGB);
 
-	workerSWIR = new WorkerSWIR;
-	threadSWIR = new QThread;
+	workerSWIR = new WorkerSWIR();
+	threadSWIR = new QThread();
 	workerSWIR->moveToThread(threadSWIR);
 
-	workerLCTF = new WorkerLCTF;
-	threadLCTF = new QThread;
-	workerLCTF->moveToThread(threadLCTF);
+	//workerLCTF = new WorkerLCTF();
+	//threadLCTF = new QThread();
+	//workerLCTF->moveToThread(threadLCTF);
 
 	InitializeAll();//界面初始化
 }
@@ -239,7 +235,7 @@ void MainWindow::InitializeAll()
 	connect(workerSWIR, SIGNAL(sendingSWIR(QImage)), this, SLOT(DisplayImageSWIR(QImage)), Qt::QueuedConnection);
 	connect(this->ui.radioButton_LCTF, SIGNAL(toggled(bool)), this, SLOT(ConnectLCTF()));
 	connect(this->ui.comboBox_wavelength, SIGNAL(currentIndexChanged(QString)), this, SLOT(WavelengthSelected()));
-	connect(this, SIGNAL(sendingWavelength(int)), workerLCTF, SLOT(waveLengthChanged(int)), Qt::QueuedConnection);
+	connect(this, SIGNAL(sendingWavelength(int)), this->workerSWIR->workerLCTF, SLOT(waveLengthChanged(int)), Qt::QueuedConnection);
 	connect(workerSWIR, SIGNAL(scanOK()), this, SLOT(StopAcquisition()), Qt::QueuedConnection);
 	connect(this, SIGNAL(scanPrepared()), workerSWIR, SLOT(Scan()), Qt::QueuedConnection);
 	connect(workerSWIR, SIGNAL(sendingCollectTime(double)), this, SLOT(DisplayCollectTime(double)), Qt::QueuedConnection);
@@ -260,7 +256,7 @@ void MainWindow::InitializeAll()
 ////////////////////////////////////////////////////////////////////////////
 bool MainWindow::ConnectRGB()
 {
-	bool isConnected = cameraRGB->Init();
+	bool isConnected = workerRGB->cameraRGB->Init();
 	if (isConnected == true)
 	{
 		//打开子线程
@@ -297,16 +293,16 @@ bool MainWindow::ConnectRGB()
 ////////////////////////////////////////////////////////////////////////////
 bool MainWindow::ConnectLCTF()
 {
-	bool isConnected = lctf->Init();
+	bool isConnected = this->workerSWIR->workerLCTF->lctf->Init();
 
 	if (isConnected == true)
 	{
 		//打开子线程
-		if (!threadLCTF->isRunning())
+		if (!this->workerSWIR->threadLCTF->isRunning())
 		{
-			threadLCTF->start();
-			bool setTime = lctf->SetSteadyTime(LCTF_INIT_STEADYTIME);
-			bool setWl = lctf->SetWavelength(LCTF_INIT_WAVELENGTH);
+			this->workerSWIR->threadLCTF->start();
+			bool setTime = this->workerSWIR->workerLCTF->lctf->SetSteadyTime(LCTF_INIT_STEADYTIME);
+			bool setWl = this->workerSWIR->workerLCTF->lctf->SetWavelength(LCTF_INIT_WAVELENGTH);
 		}
 		else
 			return false;
@@ -334,7 +330,7 @@ bool MainWindow::ConnectLCTF()
 ////////////////////////////////////////////////////////////////////////////
 bool MainWindow::ConnectSWIR()
 {
-	bool isConnected = cameraSWIR->Init();
+	bool isConnected = workerSWIR->cameraSWIR->Init();
 	if (isConnected == true)
 	{
 		if (!threadSWIR->isRunning())
@@ -472,7 +468,7 @@ void MainWindow::DisplayImageSWIR(QImage imageSWIR)
 ////////////////////////////////////////////////////////////////////////////
 void MainWindow::DisconnectRGB()
 {
-	cameraRGB->Fini();
+	workerRGB->cameraRGB->Fini();
 	this->ui.label_rgbCamera->setText("相机未连接");
 }
 ////////////////////////////////////////////////////////////////////////////
@@ -486,7 +482,7 @@ void MainWindow::DisconnectRGB()
 ////////////////////////////////////////////////////////////////////////////
 void MainWindow::DisconnectSWIR()
 {
-	cameraSWIR->Fini();
+	workerSWIR->cameraSWIR->Fini();
 	this->ui.label_swirCamera->setText("相机未连接");
 }
 ////////////////////////////////////////////////////////////////////////////
@@ -731,8 +727,8 @@ void MainWindow::DestroyAll()
 	threadRGB->quit();
 	threadRGB->wait();
 	//释放堆空间
-	delete cameraRGB;
-	cameraRGB = NULL;
+	delete workerRGB->cameraRGB;
+	workerRGB->cameraRGB = NULL;
 	delete threadRGB;
 	threadRGB = NULL;
 
@@ -740,17 +736,17 @@ void MainWindow::DestroyAll()
 		return;
 	threadSWIR->quit();
 	threadSWIR->wait();
-	delete cameraSWIR;
-	cameraSWIR = NULL;
+	delete workerSWIR->cameraSWIR;
+	workerSWIR->cameraSWIR = NULL;
 	delete threadSWIR;
 	threadSWIR = NULL;
 
-	if (threadLCTF->isFinished())
+	if (this->workerSWIR->threadLCTF->isFinished())
 		return;
-	threadLCTF->quit();
-	threadLCTF->wait();
-	delete lctf;
-	lctf = NULL;
-	delete workerLCTF;
-	threadLCTF = NULL;
+	this->workerSWIR->threadLCTF->quit();
+	this->workerSWIR->threadLCTF->wait();
+	delete this->workerSWIR->workerLCTF->lctf;
+	this->workerSWIR->workerLCTF->lctf = NULL;
+	delete this->workerSWIR->workerLCTF;
+	this->workerSWIR->threadLCTF = NULL;
 }
